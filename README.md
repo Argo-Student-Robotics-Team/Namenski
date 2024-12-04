@@ -1,4 +1,4 @@
-# Plan razvoja MCU projekta
+# Plan razvoja projekta
 
 Projekat pratimo kroz sledeće korake:
 
