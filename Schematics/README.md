@@ -1,1 +1,1 @@
-Sema celog sistema
+Sema 
