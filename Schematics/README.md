@@ -1,3 +1,3 @@
 Sema 
-![image](https://github.com/user-attachments/assets/96688c9f-cafb-4631-a88d-cd0e295280d7)
+![image](https://github.com/user-attachments/assets/73e376fa-b7dd-4b01-bc2a-b2cccb696fef)
 
