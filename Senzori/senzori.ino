@@ -1,6 +1,6 @@
 /*
 
-Ovaj kod salje podatke sa IMU i GNSS na Serial, u vidu json stringa. Namenjen je za ESP
+Ovaj kod salje podatke sa IMU i GNSS na Serial, u vidu json stringa. Namenjen je za **ESP 32** i NEO M6 GNSS
 
 Ovo je primer podatka koji se salje:
 {"latitude":37.7749,"longitude":-122.4194,"altitude":10.5,"speed":5.2,"timestamp":"2023-10-05 14:30:45","imu":{"accelerometer":{"x":1234,"y":5678,"z":9101},"gyroscope":{"x":2345,"y":6789,"z":1011},"temperature":25.3}}
@@ -19,7 +19,7 @@ Potencijalne izmene, u zavisnosti od toga koje komponente koristimo:
 #include <Wire.h>
 #include <MPU6050.h>
 
-#define GPS_BAUDRATE 38400
+#define GPS_BAUDRATE 9600
 
 TinyGPSPlus gps;
 MPU6050 mpu;
