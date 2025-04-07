@@ -19,7 +19,7 @@ Potencijalne izmene, u zavisnosti od toga koje komponente koristimo:
 #include <Wire.h>
 #include <MPU6050.h>
 
-#define GPS_BAUDRATE 9600
+#define GPS_BAUDRATE 38400
 
 TinyGPSPlus gps;
 MPU6050 mpu;
