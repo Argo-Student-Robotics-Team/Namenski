@@ -1,42 +1,24 @@
-/*
-
-Ovaj kod salje podatke sa IMU i GNSS na Serial, u vidu json stringa. Namenjen je za **ESP 8266** i NEO M9N 00b GNSS
-
-Ovo je primer podatka koji se salje:
-{"latitude":37.7749,"longitude":-122.4194,"altitude":10.5,"speed":5.2,"timestamp":"2023-10-05 14:30:45","imu":{"accelerometer":{"x":1234,"y":5678,"z":9101},"gyroscope":{"x":2345,"y":6789,"z":1011},"temperature":25.3}}
-
-Testiracu ga 10.3. ili 11.3. i okacicu snimak negde.
-
-Potencijalne izmene, u zavisnosti od toga koje komponente koristimo:
--DODATI PODATKE SA STRUJNOG SENZORA
--dodati podatke sa dosta ultrasonic senzora (bice potrebno jos oloca vrv)
--dodati podatke sa 2d lidara
-
-*/
 #include <TinyGPS++.h>
 #include <ArduinoJson.h>
 #include <Wire.h>
 #include <MPU6050_light.h>
-#include <SoftwareSerial.h>
 
-#define GPS_BAUDRATE 38400
-#define JSON_BAUDRATE 9600
-#define GPS_RX_PIN D5    // GPS TX → ESP8266 D5 (GPIO14)
-#define JSON_TX_PIN D6   // JSON output via D6 (GPIO12)
+#define GPS_BAUDRATE 38400    // NEO-M9N default baudrate
+#define GPS_RX_PIN D5         // GPS TX → ESP8266 D5 (GPIO14)
 
 TinyGPSPlus gps;
 MPU6050 mpu(Wire);
 SoftwareSerial gpsSerial(GPS_RX_PIN, 255); // RX-only for GPS
-SoftwareSerial jsonSerial(JSON_TX_PIN, 255); // TX-only for JSON
 
 void setup() {
-  Serial.begin(115200); // Debug
+  Serial.begin(115200);       // Serial Monitor for JSON output
   gpsSerial.begin(GPS_BAUDRATE);
-  jsonSerial.begin(JSON_BAUDRATE);
   
-  Wire.begin(D2, D1); // I2C: SDA=D2 (GPIO4), SCL=D1 (GPIO5)
+  Wire.begin(D2, D1);         // I2C: SDA=D2, SCL=D1
   mpu.begin();
-  mpu.calcGyroOffsets(); // Auto-calibrate IMU
+  mpu.calcGyroOffsets();      // Auto-calibrate IMU
+
+  Serial.println("\n\nSystem ready - waiting for GPS...");
 }
 
 void loop() {
@@ -49,12 +31,13 @@ void loop() {
 
   // GPS timeout check
   if (millis() > 5000 && gps.charsProcessed() < 10) {
-    jsonSerial.println("{\"error\":\"No GPS\"}");
+    Serial.println("{\"error\":\"No GPS signal\"}");
+    delay(1000);
   }
 }
 
 void processData() {
-  StaticJsonDocument<1024> doc;
+  StaticJsonDocument<512> doc;
 
   // GPS Data
   if (gps.location.isValid()) {
@@ -73,7 +56,8 @@ void processData() {
     doc["timestamp"] = timestamp;
   }
 
-  // IMU Data (calibrated)
+  // IMU Data
+  mpu.update();
   JsonObject imu = doc.createNestedObject("imu");
   imu["accelerometer"]["x"] = mpu.getAccX();
   imu["accelerometer"]["y"] = mpu.getAccY();
@@ -82,7 +66,7 @@ void processData() {
   imu["gyroscope"]["y"] = mpu.getGyroY();
   imu["gyroscope"]["z"] = mpu.getGyroZ();
 
-  // Output JSON
-  serializeJson(doc, jsonSerial);
-  jsonSerial.println();
+  // Print to Serial Monitor
+  serializeJsonPretty(doc, Serial); // "Pretty" format for readability
+  Serial.println("\n-------------------");
 }
