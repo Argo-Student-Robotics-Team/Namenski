@@ -13,62 +13,59 @@ Potencijalne izmene, u zavisnosti od toga koje komponente koristimo:
 -dodati podatke sa 2d lidara
 
 */
-
 #include <TinyGPS++.h>
 #include <ArduinoJson.h>
 #include <Wire.h>
-#include <MPU6050.h>
+#include <MPU6050_light.h>
 #include <SoftwareSerial.h>
 
-#define GPS_BAUDRATE 38400    // NEO-M9N default baudrate
-#define JSON_BAUDRATE 9600    // Output baudrate
-#define GPS_RX_PIN D5         // GPIO14 (D5) for GPS RX
-#define JSON_TX_PIN D6         // GPIO12 (D6) for JSON output
+#define GPS_BAUDRATE 38400
+#define JSON_BAUDRATE 9600
+#define GPS_RX_PIN D5    // GPS TX → ESP8266 D5 (GPIO14)
+#define JSON_TX_PIN D6   // JSON output via D6 (GPIO12)
 
 TinyGPSPlus gps;
-MPU6050 mpu;
-SoftwareSerial jsonSerial(JSON_TX_PIN, 255);  // TX-only serial for JSON
+MPU6050 mpu(Wire);
+SoftwareSerial gpsSerial(GPS_RX_PIN, 255); // RX-only for GPS
+SoftwareSerial jsonSerial(JSON_TX_PIN, 255); // TX-only for JSON
 
 void setup() {
-  Serial.begin(GPS_BAUDRATE);   // Hardware UART for GPS (RX=D6 not used)
-  jsonSerial.begin(JSON_BAUDRATE); // Software serial for output
-  Wire.begin(D2, D1);          // ESP8266 I2C (SDA=D2, SCL=D1)
+  Serial.begin(115200); // Debug
+  gpsSerial.begin(GPS_BAUDRATE);
+  jsonSerial.begin(JSON_BAUDRATE);
   
-  // Initialize MPU6050
-  mpu.initialize();
-  if(!mpu.testConnection()) {
-    jsonSerial.println("{\"error\":\"MPU6050 fail\"}");
-    while(1);
-  }
+  Wire.begin(D2, D1); // I2C: SDA=D2 (GPIO4), SCL=D1 (GPIO5)
+  mpu.begin();
+  mpu.calcGyroOffsets(); // Auto-calibrate IMU
 }
 
 void loop() {
-  // Process GPS data
-  while(Serial.available() > 0) {
-    if(gps.encode(Serial.read())) {
+  // Read GPS data
+  while (gpsSerial.available() > 0) {
+    if (gps.encode(gpsSerial.read())) {
       processData();
     }
   }
 
   // GPS timeout check
-  if(millis() > 5000 && gps.charsProcessed() < 10) {
+  if (millis() > 5000 && gps.charsProcessed() < 10) {
     jsonSerial.println("{\"error\":\"No GPS\"}");
-    delay(1000);
   }
 }
 
 void processData() {
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<1024> doc;
 
   // GPS Data
-  if(gps.location.isValid()) {
+  if (gps.location.isValid()) {
     doc["latitude"] = gps.location.lat();
     doc["longitude"] = gps.location.lng();
     doc["altitude"] = gps.altitude.meters();
     doc["speed"] = gps.speed.kmph();
   }
 
-  if(gps.date.isValid() && gps.time.isValid()) {
+  // Timestamp
+  if (gps.date.isValid() && gps.time.isValid()) {
     char timestamp[25];
     snprintf(timestamp, sizeof(timestamp), "%04d-%02d-%02dT%02d:%02d:%02dZ",
              gps.date.year(), gps.date.month(), gps.date.day(),
@@ -76,21 +73,16 @@ void processData() {
     doc["timestamp"] = timestamp;
   }
 
-  // IMU Data
-  int16_t ax, ay, az, gx, gy, gz;
-  mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-  
+  // IMU Data (calibrated)
   JsonObject imu = doc.createNestedObject("imu");
-  imu["accelerometer"]["x"] = ax;
-  imu["accelerometer"]["y"] = ay;
-  imu["accelerometer"]["z"] = az;
-  
-  imu["gyroscope"]["x"] = gx;
-  imu["gyroscope"]["y"] = gy;
-  imu["gyroscope"]["z"] = gz;
+  imu["accelerometer"]["x"] = mpu.getAccX();
+  imu["accelerometer"]["y"] = mpu.getAccY();
+  imu["accelerometer"]["z"] = mpu.getAccZ();
+  imu["gyroscope"]["x"] = mpu.getGyroX();
+  imu["gyroscope"]["y"] = mpu.getGyroY();
+  imu["gyroscope"]["z"] = mpu.getGyroZ();
 
-  // Serialize and output
-  String output;
-  serializeJson(doc, output);
-  jsonSerial.println(output);
+  // Output JSON
+  serializeJson(doc, jsonSerial);
+  jsonSerial.println();
 }
